@@ -1,0 +1,68 @@
+# CONTINUOUS DELIVERY
+# After CI passes on the main branch, build the DeployForge images, tag them and
+# publish them to GitHub Container Registry (ghcr.io).
+# No extra secrets are needed: the built-in GITHUB_TOKEN can push packages.
+# Set the repository variable PUBLISH_TO_GHCR=false to build without publishing.
+name: CD
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: Build, tag and publish images
+    runs-on: ubuntu-latest
+    # Only continue when CI was successful (or when started by hand)
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    strategy:
+      matrix:
+        service: [backend, frontend]
+    steps:
+      - name: Check out the commit that passed CI
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Set up QEMU (lets us build ARM images for Apple Silicon)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: vars.PUBLISH_TO_GHCR != 'false'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Work out image name and tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/deployforge-${{ matrix.service }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short,prefix=sha-
+            type=raw,value=build-${{ github.run_number }}
+
+      - name: Build (and push) the image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.service }}
+          push: ${{ vars.PUBLISH_TO_GHCR != 'false' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Images for both Intel and Apple Silicon Macs
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}

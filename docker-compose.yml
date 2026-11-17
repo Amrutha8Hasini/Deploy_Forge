@@ -1,0 +1,65 @@
+# DeployForge platform: start everything with
+#   docker compose up --build
+# Dashboard: http://localhost:3000     API docs: http://localhost:8000/docs
+
+name: deployforge
+
+services:
+  backend:
+    build: ./backend
+    image: deployforge-backend:latest
+    container_name: deployforge-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      SECRET_KEY: ${SECRET_KEY:-change-this-secret-key}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      APP_PORT_START: ${APP_PORT_START:-8100}
+      APP_PORT_END: ${APP_PORT_END:-8199}
+      APP_MEMORY_LIMIT: ${APP_MEMORY_LIMIT:-256m}
+      APP_CPU_LIMIT: ${APP_CPU_LIMIT:-0.5}
+      DATA_DIR: /data
+      PUBLIC_HOST: localhost
+      # The backend is a container, so it reaches deployed apps through the host
+      HEALTH_CHECK_HOST: host.docker.internal
+    extra_hosts:
+      # Makes host.docker.internal work on Linux too (it already works on Mac)
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # Lets the backend build images and start containers.
+      # ONLY the platform backend gets this. Deployed apps never do.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # SQLite database and temporary clones survive restarts
+      - deployforge-data:/data
+      # Offline backup demo: local git repos (see scripts/prepare-offline-demo.sh)
+      - ./demo-repos:/demo-repos:ro
+    labels:
+      deployforge.role: platform
+    networks:
+      - platform
+
+  frontend:
+    build: ./frontend
+    image: deployforge-frontend:latest
+    container_name: deployforge-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    labels:
+      deployforge.role: platform
+    networks:
+      - platform
+
+networks:
+  # Network for the platform itself. Deployed apps use "deployforge-apps".
+  platform:
+    name: deployforge-platform
+
+volumes:
+  deployforge-data:

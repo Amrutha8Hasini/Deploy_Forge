@@ -1,0 +1,13 @@
+flowchart TD
+    A["User clicks Deploy"] --> B["1. git clone<br/>(branch, optional token)"]
+    B --> C["2. Detect project type<br/>requirements.txt / package.json"]
+    C -->|unsupported| F["Failed<br/>(message shown)"]
+    C --> D["3. Generate Dockerfile.deployforge"]
+    D --> E["4. docker build<br/>(logs streamed to DB)"]
+    E -->|build error| F
+    E --> G["5. Save deployment (version, commit, image tag)"]
+    G --> H["6. docker run on free port 8100+<br/>memory/CPU limits, no capabilities"]
+    H --> I{"7. Health check<br/>GET /health"}
+    I -->|unhealthy| J["Remove new container<br/>old version keeps running"] --> F
+    I -->|healthy| K["8. Stop old container<br/>save version for rollback"]
+    K --> L["9. Successful — show URL"]

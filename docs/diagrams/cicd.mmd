@@ -1,0 +1,26 @@
+flowchart LR
+    dev(["Developer<br/>git push"]) --> repo[("GitHub repo")]
+    repo --> ci
+
+    subgraph ci["CI workflow (ci.yml) — every push / PR"]
+        direction TB
+        t1["Backend tests<br/>pytest"]
+        t2["Sample app tests<br/>pytest"]
+        t3["Frontend<br/>typecheck + build"]
+        t4["Docker build<br/>compose up<br/>E2E: deploy sample app"]
+        t1 --> t4
+        t2 --> t4
+        t3 --> t4
+    end
+
+    ci -- "success on main" --> cd
+    subgraph cd["CD workflow (cd.yml)"]
+        direction TB
+        c1["Build images<br/>backend + frontend"] --> c2["Tag: latest,<br/>sha-xxxxxxx, build-N"] --> c3["Push to<br/>ghcr.io"]
+    end
+
+    cd -- "manual or<br/>ENABLE_AUTO_DEPLOY" --> dp
+    subgraph dp["Deploy workflow (deploy.yml) — self-hosted runner"]
+        direction TB
+        d1["docker compose pull"] --> d2["docker compose up -d"] --> d3["Health check"]
+    end

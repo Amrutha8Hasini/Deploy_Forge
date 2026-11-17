@@ -1,0 +1,65 @@
+# DEPLOYMENT
+# Updates a running DeployForge installation to the newest published images.
+# It runs on a "self-hosted runner": a computer (for example the team MacBook
+# with Docker Desktop) that is registered with this repository under
+# Settings -> Actions -> Runners. See README "Deployment workflow".
+#
+# Started by hand (Actions tab -> Deploy -> Run workflow), or automatically
+# after CD when the repository variable ENABLE_AUTO_DEPLOY is set to true.
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to deploy (latest, sha-xxxxxxx or build-N)"
+        required: true
+        default: latest
+  workflow_run:
+    workflows: ["CD"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: deploy-platform
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Update the DeployForge platform
+    runs-on: self-hosted
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && vars.ENABLE_AUTO_DEPLOY == 'true')
+    env:
+      IMAGE_TAG: ${{ inputs.image_tag || 'latest' }}
+      COMPOSE: docker compose -f docker-compose.yml -f docker-compose.prod.yml
+    steps:
+      - name: Check out the repository (for the compose files)
+        uses: actions/checkout@v4
+
+      - name: Work out the image owner (GHCR names are lowercase)
+        run: echo "GHCR_OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+
+      - name: Log in to GitHub Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Pull the new images
+        run: $COMPOSE pull
+
+      - name: Restart the platform with the new images
+        # The .env file on the runner machine (if any) provides passwords
+        run: $COMPOSE up -d --no-build --wait
+
+      - name: Check the platform is healthy
+        run: |
+          curl -fs http://localhost:8000/api/health
+          curl -fs http://localhost:3000 | grep -q DeployForge
+          docker ps --filter "label=deployforge.role=platform"
+
+      - name: Remove old unused images
+        run: docker image prune -f

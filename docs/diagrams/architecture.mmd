@@ -1,0 +1,28 @@
+flowchart LR
+    user(["👤 User<br/>Browser"])
+    gh[("GitHub<br/>Repository")]
+
+    subgraph mac["MacBook · Docker Desktop"]
+        direction LR
+        subgraph platform["deployforge-platform network"]
+            fe["Frontend container<br/>React + Vite + Tailwind<br/>nginx :3000"]
+            be["Backend container<br/>FastAPI + SQLAlchemy<br/>Docker SDK :8000"]
+            db[("SQLite<br/>deployforge.db")]
+        end
+        engine{{"Docker Engine<br/>(docker.sock)"}}
+        subgraph apps["deployforge-apps network"]
+            a1["App container v1<br/>:8101"]
+            a2["App container v2<br/>:8102"]
+        end
+        images[("Docker images<br/>deployforge/app:v1, v2")]
+    end
+
+    user -- "dashboard" --> fe
+    fe -- "/api (REST)" --> be
+    be --- db
+    be -- "git clone" --> gh
+    be -- "build / run / stats" --> engine
+    engine --> images
+    engine --> a1
+    engine --> a2
+    user -- "open app URL" --> a2
