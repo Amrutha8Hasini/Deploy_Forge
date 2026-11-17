@@ -63,6 +63,7 @@ npm run build        # production build into dist/
 
 **Files:**
 
+- `backend/pyproject.toml`, `backend/uv.lock`, `backend/.python-version` – Python dependencies managed with uv
 - `backend/app/main.py` – creates the FastAPI app, CORS, registers routers, creates tables at start-up
 - `backend/app/config.py` – all settings from environment variables with defaults
 - `backend/app/database.py` – SQLAlchemy engine for SQLite, `SessionLocal`, `get_db` dependency
@@ -83,10 +84,10 @@ npm run build        # production build into dist/
 
 ```bash
 cd backend
-python3.12 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000     # API on :8000, docs on /docs
-pytest tests/test_api.py tests/test_auth.py -v
+uv sync                                        # create .venv and install from uv.lock
+uv run uvicorn app.main:app --reload --port 8000   # API on :8000, docs on /docs
+uv run pytest tests/test_api.py tests/test_auth.py -v
+uv add <package>                               # add a dependency (updates pyproject.toml + uv.lock)
 sqlite3 data/deployforge.db ".tables"          # show the tables
 sqlite3 data/deployforge.db "select id, version, status from deployments;"
 ```
@@ -97,6 +98,7 @@ sqlite3 data/deployforge.db "select id, version, status from deployments;"
 - The 4 tables and their relationships (one application has many deployments; one deployment has many log lines).
 - Why SQLite: a single file, no server, perfect for a local demo.
 - How login works and why the GitHub token is never sent back to the browser.
+- How Python dependencies are managed with uv: `pyproject.toml` lists what we need, `uv.lock` pins exact versions, `uv sync` builds `.venv`, `uv run` runs inside it.
 
 ---
 
@@ -122,9 +124,9 @@ sqlite3 data/deployforge.db "select id, version, status from deployments;"
 **Commands:**
 
 ```bash
-cd backend && source .venv/bin/activate
-pytest tests/test_detector.py tests/test_dockerfile_generator.py tests/test_github_service.py -v
-python -c "from pathlib import Path; from app.services.detector import detect_project; print(detect_project(Path('../sample-app')))"
+cd backend
+uv run pytest tests/test_detector.py tests/test_dockerfile_generator.py tests/test_github_service.py -v
+uv run python -c "from pathlib import Path; from app.services.detector import detect_project; print(detect_project(Path('../sample-app')))"
 git ls-remote --heads https://github.com/Amrutha8Hasini/Deploy_Forge
 ```
 
@@ -205,8 +207,8 @@ docker compose down
 **Commands:**
 
 ```bash
-cd backend && source .venv/bin/activate && pytest -v
-cd ../sample-app && .venv/bin/pytest -v
+cd backend && uv run pytest -v
+cd ../sample-app && uv run --no-project --with-requirements requirements.txt --with pytest pytest -v
 docker stats --no-stream
 curl http://localhost:8100/health
 docker images deployforge/*

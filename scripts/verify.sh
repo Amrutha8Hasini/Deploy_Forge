@@ -5,17 +5,16 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+command -v uv >/dev/null || { echo "uv is not installed: brew install uv"; exit 1; }
+
 echo "==> 1/4 Backend tests"
 ( cd backend
-  [ -d .venv ] || python3 -m venv .venv
-  .venv/bin/pip install -q -r requirements.txt
-  .venv/bin/python -m pytest -q )
+  uv sync              # creates backend/.venv from pyproject.toml / uv.lock
+  uv run pytest -q )
 
 echo "==> 2/4 Sample app tests"
 ( cd sample-app
-  [ -d .venv ] || python3 -m venv .venv
-  .venv/bin/pip install -q -r requirements.txt pytest
-  .venv/bin/python -m pytest -q )
+  uv run --no-project --with-requirements requirements.txt --with pytest pytest -q )
 
 echo "==> 3/4 Frontend type check and build"
 ( cd frontend

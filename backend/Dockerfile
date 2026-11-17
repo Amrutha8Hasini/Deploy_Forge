@@ -1,4 +1,4 @@
-# DeployForge backend (FastAPI + Docker SDK)
+# DeployForge backend (FastAPI + Docker SDK), dependencies installed with uv
 FROM python:3.12-slim
 
 # git is needed to clone the repositories that users deploy
@@ -7,15 +7,25 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && git config --system --add safe.directory '*'
 
+# Copy the uv binary from Astral's official image (no pip install needed)
+COPY --from=ghcr.io/astral-sh/uv:0.13.4 /uv /uvx /bin/
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never \
     DATA_DIR=/data
 
 WORKDIR /app
 
-# Install Python packages first so Docker can cache this layer
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install dependencies first so Docker can cache this layer.
+# --no-dev skips pytest/httpx; --locked uses exactly the versions in uv.lock.
+COPY pyproject.toml uv.lock* ./
+RUN if [ -f uv.lock ]; then uv sync --locked --no-dev; else uv sync --no-dev; fi
+
+# Use the virtual environment uv created in /app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
 
 COPY app ./app
 

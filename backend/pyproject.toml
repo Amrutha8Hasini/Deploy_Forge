@@ -1,0 +1,31 @@
+# Python project settings for the DeployForge backend, managed with uv.
+#   uv sync          -> creates .venv and installs everything (incl. dev tools)
+#   uv run pytest    -> runs the tests inside that environment
+#   uv add <pkg>     -> adds a new dependency (updates this file and uv.lock)
+[project]
+name = "deployforge-backend"
+version = "1.0.0"
+description = "DeployForge backend: FastAPI + SQLAlchemy + Docker SDK"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.115.12",          # web framework
+    "uvicorn[standard]==0.34.2",  # web server that runs FastAPI
+    "sqlalchemy==2.0.40",         # database (SQLite) through an ORM
+    "docker==7.1.0",              # Docker SDK: build images, run containers, stats
+    "requests==2.32.3",           # health checks of deployed applications
+]
+
+[dependency-groups]
+# Only needed for development and CI, not inside the production image
+dev = [
+    "pytest==8.3.5",
+    "httpx==0.28.1",              # required by FastAPI's TestClient
+]
+
+[tool.uv]
+# The backend is an application, not a library to publish, so uv only
+# installs its dependencies and does not try to build/install it as a package.
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

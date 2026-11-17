@@ -122,6 +122,7 @@ created only when a deployment builds and passes its health check.
 | --------------- | --------------------------------------------- | ---------------------------------------------------------------- |
 | Frontend        | React, TypeScript, Vite, Tailwind CSS         | Component-based UI, type safety, fast builds, consistent styling |
 | Backend         | Python, FastAPI, Uvicorn                      | Simple syntax, automatic validation and API docs                 |
+| Python tooling  | uv (pyproject.toml + uv.lock)                 | One fast tool for virtual environments and locked dependencies   |
 | Database        | SQLite + SQLAlchemy                           | Zero setup, single file, ORM instead of raw SQL                  |
 | Containers      | Docker, Docker Compose, Docker SDK for Python | Industry standard, runs locally, scriptable from Python          |
 | Version control | Git, GitHub                                   | Team collaboration with branches and pull requests               |
@@ -178,7 +179,7 @@ and recent logs.
 
 ## 9.1 Backend
 
-The backend is organised as routers (HTTP endpoints) and services (logic):
+The backend is organised as routers (HTTP endpoints) and services (logic). Its Python dependencies are declared in `pyproject.toml` and locked in `uv.lock`; the uv tool creates the virtual environment, so every developer, the CI pipeline and the Docker image use exactly the same package versions.
 
 - `github_service.py` runs `git` through `subprocess` with an argument list (not a shell), which avoids command injection.
 - `detector.py` and `dockerfile_generator.py` are plain Python functions, which makes them easy to test.
@@ -206,7 +207,7 @@ successful, blue building, red failed, amber rolled back).
 
 ## 9.3 Docker and Docker Compose
 
-- `backend/Dockerfile`: Python 3.12 slim image with `git`, dependencies, a container health check and Uvicorn.
+- `backend/Dockerfile`: Python 3.12 slim image with `git`; dependencies are installed with uv from the locked `uv.lock` (`uv sync --locked --no-dev`), followed by a container health check and Uvicorn.
 - `frontend/Dockerfile`: multi-stage build — Node builds the React app, nginx serves it and forwards `/api` to the backend.
 - `docker-compose.yml`: backend and frontend containers, a named volume for the database, the Docker socket
   mounted **only** into the backend, `host.docker.internal` for health checks, and labels

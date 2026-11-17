@@ -13,11 +13,14 @@ A small Flask app used to demonstrate DeployForge.
 
 ```bash
 cd sample-app
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt pytest
-python app.py          # open http://localhost:8000
-pytest                 # run the tests
+uv run --no-project --with-requirements requirements.txt python app.py               # open http://localhost:8000
+uv run --no-project --with-requirements requirements.txt --with pytest pytest -v     # run the tests
 ```
+
+The sample app intentionally keeps a plain `requirements.txt` (no `pyproject.toml`),
+because it represents "a user's project" and `requirements.txt` is what
+DeployForge detects. `uv run --with-requirements` builds a cached temporary
+environment from it, so no manual virtual environment is needed.
 
 ## Deploy with DeployForge
 
